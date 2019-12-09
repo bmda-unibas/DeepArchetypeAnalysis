@@ -22,6 +22,6 @@ Helper functions for downloading the data will be added in the future.
 Sebastian Matthias Keller, Maxim Samarin, Fabricio Arend Torres, Mario Wieser, Volker Roth
 
 # References
-[1] Keller, Sebastian Mathias, et al. "Deep Archetypal Analysis." arXiv preprint arXiv:1901.10799 (2019).
+[1] [Keller, Sebastian Mathias, et al. "Deep Archetypal Analysis." arXiv preprint arXiv:1901.10799 (2019).](https://arxiv.org/abs/1901.10799)
 
-[2] Lyons, Michael J., et al. "The Japanese female facial expression (JAFFE) database." Proceedings of third international conference on automatic face and gesture recognition. 1998.
+[2] [Lyons, Michael J., et al. "The Japanese female facial expression (JAFFE) database." Proceedings of third international conference on automatic face and gesture recognition. 1998.](https://zenodo.org/record/3451524)
