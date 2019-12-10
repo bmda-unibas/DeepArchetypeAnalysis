@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 
 tfd = tf.contrib.distributions
-from IPython import embed
 
 
 def build_prior(dim_latentspace):
