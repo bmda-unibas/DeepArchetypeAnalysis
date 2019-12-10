@@ -13,10 +13,19 @@ multivariate data points as sparse convex combinations of extremal elements of t
 Unlike the original formulation of AA, <i>“Deep AA”</i> can also handle side information and provides the ability for data-driven representation learning which reduces the dependence on expert knowledge.
 
 # Usage
-The JAFFE labels / emotions as a CSV have to be at 'DeepArchetypeAnalysis/jaffe/labels.csv'.
-The images in 'DeepArchetypeAnalysis/jaffe/images'.
+<b>This setup relies on conda.</b> The setup is provided in `environment.yml`
 
-Helper functions for downloading the data will be added in the future.
+For automatically setting up a virtual environment and downloading & preprocessing JAFFE, a Makefile is provided.
+
+```
+# Download JAFFE; create virtenv in directory ./venv
+>make
+# Activate virtual environment
+>source activate venv
+# run code with default settings
+>python daa_JAFFE.py
+```
+
 
 # Authors
 Sebastian Matthias Keller, Maxim Samarin, Fabricio Arend Torres, Mario Wieser, Volker Roth
