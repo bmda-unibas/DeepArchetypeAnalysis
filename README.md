@@ -30,9 +30,7 @@ complex  sideinformation during training.
 The JAFFE labels / emotions as a CSV have to be at `DeepArchetypeAnalysis/jaffe/labels.csv`.
 The images in `DeepArchetypeAnalysis/jaffe/images`.
 
-For downloading the data you can use the provided `Makefile`, i.e. just run `make`.
-
-<b>This setup relies on conda.</b> The setup is provided in `environment.yml`
+<b>The setup relies on conda.</b> It is provided in `environment.yml`
 
 For automatically setting up a virtual environment and downloading & preprocessing JAFFE, a Makefile is provided.
 
