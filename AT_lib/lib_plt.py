@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-
+from mpl_toolkits.mplot3d import Axes3D
 
 def interpolate_points(coord_init, coord_end, nb_samples):
     """
@@ -59,9 +59,9 @@ def plot_samples(samples, latent_codes, labels,
             if epoch is not None:
                 ax.set_ylabel('Epoch {}'.format(epoch))
             ax.set_aspect('equal')
-            ax.plot(Z_fix[0, :], Z_fix[1, :], 'r-')
-            ax.plot(Z_fix[1, :], Z_fix[2, :], 'r-')
-            ax.plot(Z_fix[2, :], Z_fix[0, :], 'r-')
+            # ax.plot(Z_fix[0, :], Z_fix[1, :], 'r-')
+            # ax.plot(Z_fix[1, :], Z_fix[2, :], 'r-')
+            # ax.plot(Z_fix[2, :], Z_fix[0, :], 'r-')
 
         ax.scatter(*[latent_codes[:, i] for i in range(latent_codes.shape[1])],
                    s=2, c=labels, alpha=0.5)
