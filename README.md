@@ -25,10 +25,10 @@ complex  sideinformation during training.
 
 # Usage
 
-The JAFFE labels / emotions as a CSV have to be at 'DeepArchetypeAnalysis/jaffe/labels.csv'.
-The images in 'DeepArchetypeAnalysis/jaffe/images'.
+The JAFFE labels / emotions as a CSV have to be at `DeepArchetypeAnalysis/jaffe/labels.csv`.
+The images in `DeepArchetypeAnalysis/jaffe/images`.
 
-For downloading the data you can use the provided 'Makefile', i.e. just run 'make'.
+For downloading the data you can use the provided `Makefile`, i.e. just run `make`.
 
 <b>This setup relies on conda.</b> The setup is provided in `environment.yml`
 
@@ -45,9 +45,9 @@ For automatically setting up a virtual environment and downloading & preprocessi
 
 
 ### Code Structure
-The main components & NN architecture are available in 'AT_lib/lib_vae.py'.
-Plotting and other utilities are in 'AT_lib/lib_plt.py' and 'AT_lib/lib_at.py' respectively.
-The main code is given in 'daa_JAFFE.py'. 
+The main components & NN architecture are available in `AT_lib/lib_vae.py`.
+Plotting and other utilities are in `AT_lib/lib_plt.py` and `AT_lib/lib_at.py` respectively.
+The main code is given in `daa_JAFFE.py`. 
 
 Aside from the default settings, different priors as well as a vanilla VAE with the same architecture are available.
 
