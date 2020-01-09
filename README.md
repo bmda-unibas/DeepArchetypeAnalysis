@@ -4,6 +4,8 @@
 Code of the Deep Archetype Analysis[1] applied to the JAFFE dataset[2].
 Created in context of the <b>NeurIPS 2019 Workshop <i>Learning Meaningful Representations of Life</i></b> and the <b>IJCV 2019 <i>GCPR Special Issue</i></b>. 
 
+The Workshop poster is also provided as a pdf: `NeurIPS19_LMRL_poster.pdf`
+
 ## Abstract
 Archetypes are typical population representatives  in  an  extremal  sense,  where  typicality  is  understood as the 
 most extreme manifestation of a trait or feature. 
