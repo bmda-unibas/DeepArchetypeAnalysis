@@ -29,6 +29,20 @@ The images in 'DeepArchetypeAnalysis/jaffe/images'.
 
 For downloading the data you can use the provided 'Makefile', i.e. just run 'make'.
 
+<b>This setup relies on conda.</b> The setup is provided in `environment.yml`
+
+For automatically setting up a virtual environment and downloading & preprocessing JAFFE, a Makefile is provided.
+
+```
+# Download JAFFE; create virtenv in directory ./venv
+>make
+# Activate virtual environment
+>source activate venv
+# run code with default settings
+>python daa_JAFFE.py
+```
+
+
 ### Code Structure
 The main components & NN architecture are available in 'AT_lib/lib_vae.py'.
 Plotting and other utilities are in 'AT_lib/lib_plt.py' and 'AT_lib/lib_at.py' respectively.
@@ -37,6 +51,6 @@ The main code is given in 'daa_JAFFE.py'.
 Aside from the default settings, different priors as well as a vanilla VAE with the same architecture are available.
 
 # References
-[1] Keller, Sebastian Mathias, et al. "Deep Archetypal Analysis." arXiv preprint arXiv:1901.10799 (2019).
+[1] [Keller S.M., Samarin M., Wieser M., Roth V. (2019) Deep Archetypal Analysis. In: Fink G., Frintrop S., Jiang X. (eds) Pattern Recognition. DAGM GCPR 2019. Lecture Notes in Computer Science, vol 11824. Springer, Cham](https://doi.org/10.1007/978-3-030-33676-9_12)
 
 [2] Lyons, Michael J., et al. "The Japanese female facial expression (JAFFE) database." Proceedings of third international conference on automatic face and gesture recognition. 1998.
