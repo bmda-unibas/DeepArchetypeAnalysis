@@ -1,4 +1,5 @@
 # Deep Archetype Analysis
+![Latent Traversal inbetween the Archetypes](https://github.com/bmda-unibas/DeepArchetypeAnalysis/blob/master/animation.gif "Traversal inbetween the Archetypes")
 ## Repository Description
 Code of the Deep Archetype Analysis[1] applied to the JAFFE dataset[2].
 Created in context of the <b>NeurIPS 2019 Workshop <i>Learning Meaningful Representations of Life</i></b> and the <b>IJCV 2019 <i>GCPR Special Issue</i></b>. 
