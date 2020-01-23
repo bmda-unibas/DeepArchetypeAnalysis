@@ -1,5 +1,5 @@
 conda_venv: environment.yml download_jaffe
-	test -d venv || conda env create -f environment.yml
+	conda env create -f environment.yml
 
 download_jaffe:
 	test -d ./downloads || mkdir ./downloads
