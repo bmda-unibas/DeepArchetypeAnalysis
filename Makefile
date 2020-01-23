@@ -1,5 +1,5 @@
 conda_venv: environment.yml download_jaffe
-	test -d venv || conda env create --prefix=venv -f environment.yml
+	test -d venv || conda env create -f environment.yml
 
 download_jaffe:
 	test -d ./downloads || mkdir ./downloads
@@ -16,4 +16,3 @@ download_jaffe:
 
 clean:
 	rm -rf ./downloads
-	rm -rf ./venv
