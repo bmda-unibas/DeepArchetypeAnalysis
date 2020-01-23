@@ -1,10 +1,11 @@
-# Deep Archetype Analysis
+# Learning Extremal Representations with Deep Archetypal Analysis
 ![Latent Traversal inbetween the Archetypes](https://github.com/bmda-unibas/DeepArchetypeAnalysis/blob/master/animation.gif "Traversal inbetween the Archetypes")
 ## Repository Description
-Code of the Deep Archetype Analysis[1] applied to the JAFFE dataset[2].
-Created in context of the <b>NeurIPS 2019 Workshop <i>Learning Meaningful Representations of Life</i></b> and the <b>IJCV 2019 <i>GCPR Special Issue</i></b>. 
+We present a sample implementation (TensorFlow 1.12) of Deep Archetype Analysis [1] applied to the JAFFE dataset [2]. 
+This repository was created in the context of the <b>NeurIPS 2019 Workshop on <i>Learning Meaningful Representations of 
+Life</i></b> and the <b>IJCV 2019 <i>GCPR Special Issue</i></b>. 
 
-The Workshop poster is also provided as a pdf: `NeurIPS19_LMRL_poster.pdf`
+The workshop poster is provided as a pdf: [NeurIPS19_LMRL_poster.pdf](NeurIPS19_LMRL_poster.pdf)
 
 ## Abstract
 Archetypes are typical population representatives  in  an  extremal  sense,  where  typicality  is  understood as the 
@@ -25,29 +26,45 @@ complex  sideinformation during training.
 
  As a consequence, the answer to the question ”What is typical in a given dataset?” can be guided by this additional information.
 
-# Usage
+# How to run the Code
 
-The JAFFE labels / emotions as a CSV have to be at `DeepArchetypeAnalysis/jaffe/labels.csv`.
-The images in `DeepArchetypeAnalysis/jaffe/images`.
+We provide a Makefile to set up your environment in which you can run the code.
 
-<b>The setup relies on conda.</b> It is provided in `environment.yml`
+Note that:
 
-For automatically setting up a virtual environment and downloading & preprocessing JAFFE, a Makefile is provided.
+- The setup relies on conda and the required libraries are specified in `environment.yml`.
+- The implementation is meant to be executed on a <b>GPU</b>. In order to run the code on a CPU some modifications are required. 
+For instance tensorflow-gpu needs to be replace by the CPU version.
+- The JAFFE labels (emotion scores) as a CSV are expected to be at `DeepArchetypeAnalysis/jaffe/labels.csv` with the corresponding 
+images in the folder `DeepArchetypeAnalysis/jaffe/images`.
 
+### Makefile Setup
+For automatically downloading, preprocessing JAFFE and setting up the conda environment, a Makefile is provided. Navigate to 
+`DeepArchetypeAnalysis` folder and perform the following step in your terminal.
 ```
-# Download JAFFE; create virtenv in directory ./venv
->make
-# Activate virtual environment
->source activate venv
-# run code with default settings
->python daa_JAFFE.py
+make
 ```
+downloads JAFFE and creates the conda environment `deepaa`.
 
+### Running the Script
+
+With
+```
+source activate deepaa
+```
+the conda environment is activated and the script can be executed. Use
+```
+python daa_JAFFE.py
+```
+to execute the script with the default arguments for number of epochs, batch size etc. Check out `daa_JAFFE.py` for the available arguments, e.g. 
+```
+python daa_JAFFE.py --n-epochs 100 --dim-latentspace 5
+```
 
 ### Code Structure
-The main components & NN architecture are available in `AT_lib/lib_vae.py`.
-Plotting and other utilities are in `AT_lib/lib_plt.py` and `AT_lib/lib_at.py` respectively.
-The main code is given in `daa_JAFFE.py`. 
+
+The main code is given in `daa_JAFFE.py`. The main components of the neural network architecture are available in `AT_lib/lib_vae.py`.
+Plotting and other utilities are provided in `AT_lib/lib_plt.py` and `AT_lib/lib_at.py`, respectively.
 
 Aside from the default settings, different priors as well as a vanilla VAE with the same architecture are available.
 
