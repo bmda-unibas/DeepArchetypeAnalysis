@@ -1,7 +1,7 @@
 # Learning Extremal Representations with Deep Archetypal Analysis
 ![Latent Traversal inbetween the Archetypes](https://github.com/bmda-unibas/DeepArchetypeAnalysis/blob/master/animation.gif "Traversal inbetween the Archetypes")
 ## Repository Description
-We present a sample implementation (TensorFlow 1.12) of Deep Archetype Analysis [1] applied to the JAFFE dataset [2]. 
+We present a sample implementation (TensorFlow 1.12) of Deep Archetypal Analysis [1] applied to the JAFFE dataset [2]. 
 This repository was created in the context of the <b>NeurIPS 2019 Workshop on <i>Learning Meaningful Representations of 
 Life</i></b> and the <b>IJCV 2019 <i>GCPR Special Issue</i></b>. 
 
@@ -39,7 +39,7 @@ For instance tensorflow-gpu needs to be replace by the CPU version.
 images in the folder `DeepArchetypeAnalysis/jaffe/images`.
 
 ### Makefile Setup
-For automatically downloading, preprocessing JAFFE and setting up the conda environment, a Makefile is provided. Navigate to 
+For automatically downloading, preprocessing JAFFE and setting up the conda environment, a Makefile is provided. Navigate to the 
 `DeepArchetypeAnalysis` folder and perform the following step in your terminal.
 ```
 make
