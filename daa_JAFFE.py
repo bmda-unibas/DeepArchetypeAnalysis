@@ -19,6 +19,8 @@ from jaffe import jaffe_data
 
 tfd = tf.contrib.distributions
 
+# If error message "Could not connect to any X display." is issued, uncomment the following line:
+#os.environ['QT_QPA_PLATFORM']='offscreen'
 
 def main():
     def build_loss():
