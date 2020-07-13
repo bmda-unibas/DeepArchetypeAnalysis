@@ -3,10 +3,10 @@ channels:
   - defaults
 dependencies:
   - python=3.6.8
-  - matplotlib
-  - seaborn
-  - numpy
-  - pandas
-  - scipy  
-  - imageio
-  - tensorflow-gpu=1.12.0
+  - matplotlib=3.1.1
+  - seaborn=0.9.0
+  - numpy=1.17.2
+  - pandas=0.25.1
+  - scipy=1.2.0
+  - imageio=2.6.1
+  - tensorflow=1.12.0
