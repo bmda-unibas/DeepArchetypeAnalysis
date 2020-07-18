@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
 
+
 def interpolate_points(coord_init, coord_end, nb_samples):
     """
     Utility function for interpolation between two points.
@@ -62,9 +63,20 @@ def plot_samples(samples, latent_codes, labels,
             # ax.plot(Z_fix[0, :], Z_fix[1, :], 'r-')
             # ax.plot(Z_fix[1, :], Z_fix[2, :], 'r-')
             # ax.plot(Z_fix[2, :], Z_fix[0, :], 'r-')
-
-        ax.scatter(*[latent_codes[:, i] for i in range(latent_codes.shape[1])],
-                   s=2, c=labels, alpha=0.5)
+        colors = ["blue", "orange", "green", "purple", "black"]
+        label_str = ["HAP", "SAD", "SUR", "ANG", "DIS"]
+        for lab in np.unique(labels):
+            coords = latent_codes[labels == lab, ...]
+            # from ipdb import set_trace
+            # set_trace()
+            ax.scatter(coords[:, 0], coords[:, 1],
+                       s=3, c=np.repeat(colors[lab], coords.shape[0]), label=label_str[lab], alpha=0.5,
+                       marker='o')
+            ax.set_xlim(-4, 4)
+            ax.set_ylim(-4, 4)
+        # ax.scatter(*[latent_codes[:, i] for i in range(latent_codes.shape[1])],
+        #            s=5, c=labels, label=np.unique(labels), alpha=0.5)
+        ax.legend(fontsize=2)
 
         if not latent_ticks:
             ax.set_xlim(latent_codes.min() - .1, latent_codes.max() + .1)
