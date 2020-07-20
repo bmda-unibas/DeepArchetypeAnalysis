@@ -17,8 +17,6 @@ import tensorflow as tf
 from AT_lib import lib_vae, lib_at, lib_plt
 from jaffe import jaffe_data
 
-from ipdb import set_trace
-
 tfd = tf.contrib.distributions
 
 
@@ -64,10 +62,14 @@ def main():
     # # Japanese Face Expressions
 
     X, Y, jaffe_meta_data = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR, crop=True)
+    X_test, Y_test, jaffe_meta_data_test = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR,
+                                                                     crop=True)
+    X_noncrop, _, _ = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR,
+                                                crop=False)
     Y = Y[..., :args.num_labels]
 
-    train_data = tf.data.Dataset.from_tensor_slices((X, Y)).shuffle(buffer_size=180).batch(args.batch_size)
-    test_data = tf.data.Dataset.from_tensor_slices((X, Y)).batch(args.batch_size)
+    train_data = tf.data.Dataset.from_tensor_slices((X, Y)).shuffle(buffer_size=180).batch(args.batch_size).repeat(-1)
+    test_data = tf.data.Dataset.from_tensor_slices((X_test, Y_test)).batch(args.batch_size).repeat(-1)
 
     data_shape = list(X.shape[1:])
 
@@ -116,7 +118,8 @@ def main():
     archetype_loss, sideinfo_loss, likelihood, kl_divergence, elbo = build_loss()
 
     # Build the optimizer
-    optimizer = tf.train.AdamOptimizer(args.learning_rate).minimize(-elbo)
+    lr = tf.Variable(args.learning_rate, trainable=False)
+    optimizer = tf.train.AdamOptimizer(lr).minimize(-elbo)
 
     # reconstruction of random samples from a dirichlet
     dirichlet_prior = lib_vae.dirichlet_prior(dim_latentspace=args.dim_latentspace, alpha=0.7)
@@ -173,28 +176,38 @@ def main():
         fig.savefig(FINAL_RESULTS_DIR / filename, dpi=600)
         plt.close(fig)
 
-    def plot_z_fixed(path=None):
+    def plot_z_fixed(path=None, plot_generated=False):
         """
         Plot at the archetypes Z_fixed.
         :param path: target path for the file. Defaults to FINAL_RESULTS_DIR/'Z_fixed_final.png'
+        :param plot_generated:
         :return:
         """
 
-        samples_z_fixed = sess.run(latent_decoded_x.mean(), {latent_code: z_fixed_})
-
         latent_code_train = None
-        for i in range(num_mb_its_per_epoch):
-            min_idx = i * args.batch_size
-            max_idx = min((i + 1) * args.batch_size, X.shape[0])
+        for i in range(num_mb_its_per_epoch_test):
+            mb_x, mb_y = sess.run(test_iterator)
 
-            tmp = sess.run(mu_t, feed_dict={data: X[min_idx:max_idx],
-                                            side_information: Y[min_idx:max_idx]})
+            tmp = sess.run(mu_t, feed_dict={data: mb_x,
+                                            side_information: mb_y})
             latent_code_train = np.vstack((latent_code_train, tmp)) if latent_code_train is not None else tmp
 
         assert latent_code_train.shape[0] == X.shape[0]
-        fig_zfixed = lib_plt.plot_samples(samples=samples_z_fixed, latent_codes=latent_code_train,
+
+        if plot_generated:
+            image_z_fixed, label_z_fixed = sess.run([latent_decoded_x.mean(), latent_decoded_y], {latent_code: z_fixed_})
+            label_z_fixed = np.argmax(label_z_fixed, axis=1)
+        else:
+            idx_closest_to_at = []
+            for i in range(z_fixed_.shape[0]):
+                idx_closest_to_at.append(np.argmin(np.linalg.norm(latent_code_train - z_fixed_[i, ...], axis=1)))
+            image_z_fixed = X_noncrop[idx_closest_to_at, ...]
+            label_z_fixed = np.argmax(Y_test[idx_closest_to_at, ...], axis=1)
+
+        fig_zfixed = lib_plt.plot_samples(samples=image_z_fixed, latent_codes=latent_code_train,
                                           labels=np.argmax(Y, axis=1),
-                                          epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)])
+                                          epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)],
+                                          img_labels=label_z_fixed)
         # set_trace()
         fig_zfixed.savefig(path, dpi=300)
         plt.close(fig_zfixed)
@@ -328,15 +341,23 @@ def main():
     ####################################################################################################################
     # ########################################### Training Loop ########################################################
     num_mb_its_per_epoch = int(np.ceil(X.shape[0] / args.batch_size))
+    num_mb_its_per_epoch_test = int(np.ceil(X_test.shape[0] / args.batch_size))
 
     saver = tf.train.Saver()
     step = 0
     sess.run(tf.global_variables_initializer())
+    train_iterator = train_data.make_one_shot_iterator().get_next()
+    test_iterator = test_data.make_one_shot_iterator().get_next()
+
+    adjusted_lr = False
     cur_kl_factor = 5000
     if not args.test_model:
         writer = tf.summary.FileWriter(logdir=TENSORBOARD_DIR, graph=sess.graph)
         for epoch in range(args.n_epochs):
-            train_iterator = train_data.make_one_shot_iterator().get_next()
+            if epoch >= 2000 and not adjusted_lr:
+                tf.assign(lr, 5e-4)
+                adjusted_lr = True
+
             for b in range(num_mb_its_per_epoch):
                 mb_x, mb_y = sess.run(train_iterator)
                 feed_train = {data: mb_x, side_information: mb_y, kl_loss_factor: cur_kl_factor}
@@ -350,10 +371,9 @@ def main():
                 tensors_test = [summary_op, elbo,
                                 likelihood,
                                 kl_divergence, archetype_loss, sideinfo_loss]
-                test_iterator = test_data.make_one_shot_iterator().get_next()
 
                 test_total_loss, test_likelihood, test_kl, test_atl, test_sideinfol = 0, 0, 0, 0, 0
-                for b in range(num_mb_its_per_epoch):
+                for b in range(num_mb_its_per_epoch_test):
                     mb_x, mb_y = sess.run(test_iterator)
                     feed_test = {data: mb_x, side_information: mb_y, kl_loss_factor: cur_kl_factor}
                     summary, test_total_loss_, test_likelihood_, test_kl_, test_atl_, test_sideinfol_ = sess.run(
@@ -366,7 +386,6 @@ def main():
                     test_kl += test_kl_
                     test_atl += test_atl_
                     test_sideinfol += test_sideinfol_
-
 
                 test_total_loss /= num_mb_its_per_epoch
                 test_likelihood /= num_mb_its_per_epoch
@@ -431,13 +450,13 @@ if __name__ == '__main__':
     # Logging Settings
     parser.add_argument('--runNB', type=str, default="1")
     parser.add_argument('--results-path', type=str, default='./Results/JAFFE')
-    parser.add_argument('--test-frequency-epochs', type=int, default=5)
+    parser.add_argument('--test-frequency-epochs', type=int, default=100)
     parser.add_argument('--save_each', type=int, default=10000)
 
     # NN settings
     parser.add_argument('--gpu', type=str, default='0')
-    parser.add_argument('--learning-rate', type=float, default=1e-4)
-    parser.add_argument('--n-epochs', type=int, default=5001)
+    parser.add_argument('--learning-rate', type=float, default=1e-3)
+    parser.add_argument('--n-epochs', type=int, default=3001)
     parser.add_argument('--batch-size', type=int, default=50)
     parser.add_argument('--dim-latentspace', type=int, default=2,
                         help="Number of Archetypes = Latent Space Dimension + 1")
@@ -447,9 +466,9 @@ if __name__ == '__main__':
                         help="Learn variance of decoder. If false, set to constant '1.0'.")
 
     # DAA loss: weights
-    parser.add_argument('--at-loss-factor', type=float, default=80.0)
-    parser.add_argument('--class-loss-factor', type=float, default=80.0)
-    parser.add_argument('--recon-loss-factor', type=float, default=1.0)
+    parser.add_argument('--at-loss-factor', type=float, default=100.0)
+    parser.add_argument('--class-loss-factor', type=float, default=200.0)
+    parser.add_argument('--recon-loss-factor', type=float, default=0.4)
     parser.add_argument('--kl-loss-factor', type=float, default=40.0)
     parser.add_argument('--kl-decrease-factor', type=float, default=1.5)
 
