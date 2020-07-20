@@ -62,6 +62,13 @@ def main():
     # # Japanese Face Expressions
 
     X, Y, jaffe_meta_data = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR, crop=True)
+
+    if args.bs_sample:
+        bs_idx = np.random.choice(X.shape[0], size=X.shape[0], replace=True)
+        X = X[bs_idx, ...]
+        Y = Y[bs_idx, ...]
+        jaffe_meta_data = jaffe_meta_data.iloc[bs_idx]
+
     X_test, Y_test, jaffe_meta_data_test = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR,
                                                                      crop=True)
     X_noncrop, _, _ = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR,
@@ -176,7 +183,7 @@ def main():
         fig.savefig(FINAL_RESULTS_DIR / filename, dpi=600)
         plt.close(fig)
 
-    def plot_z_fixed(path=None, plot_generated=False):
+    def plot_z_fixed(path, plot_generated=False):
         """
         Plot at the archetypes Z_fixed.
         :param path: target path for the file. Defaults to FINAL_RESULTS_DIR/'Z_fixed_final.png'
@@ -195,7 +202,8 @@ def main():
         assert latent_code_train.shape[0] == X.shape[0]
 
         if plot_generated:
-            image_z_fixed, label_z_fixed = sess.run([latent_decoded_x.mean(), latent_decoded_y], {latent_code: z_fixed_})
+            image_z_fixed, label_z_fixed = sess.run([latent_decoded_x.mean(), latent_decoded_y],
+                                                    {latent_code: z_fixed_})
             label_z_fixed = np.argmax(label_z_fixed, axis=1)
         else:
             idx_closest_to_at = []
@@ -208,7 +216,6 @@ def main():
                                           labels=np.argmax(Y, axis=1),
                                           epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)],
                                           img_labels=label_z_fixed)
-        # set_trace()
         fig_zfixed.savefig(path, dpi=300)
         plt.close(fig_zfixed)
 
@@ -401,7 +408,7 @@ def main():
                       )
 
                 # reconstruction from the location of the fixed archetypes
-                plot_z_fixed(IMGS_DIR / f'Z_fixed_epoch{epoch}.png')
+                plot_z_fixed(IMGS_DIR / f'Z_fixed_epoch{epoch}.png', plot_generated=True)
                 # plot_random_samples(IMGS_DIR / f'random_sample_epoch{epoch}.png')
 
             if epoch % args.save_each == 0 and epoch > 0:
@@ -416,7 +423,8 @@ def main():
         if not FINAL_RESULTS_DIR.exists():
             os.mkdir(FINAL_RESULTS_DIR)
 
-        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final.png')
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final.png', plot_generated=False)
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final_closest.png', plot_generated=True)
 
         df = create_latent_df()
         df.to_csv(FINAL_RESULTS_DIR / "latent_codes.csv", index=False)
@@ -438,7 +446,8 @@ def main():
         # Plots
         print("Creating plots in '{0}'".format(FINAL_RESULTS_DIR))
         plot_latent_traversal()
-        plot_z_fixed()
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final.png', plot_generated=False)
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final_closest.png', plot_generated=True)
         plot_hinton(weight_target=0.65)
         plot_interpolation(start_img_str="YM.HA3", end_img_str="MK.SA3")
 
@@ -464,6 +473,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_labels', type=int, default=5)
     parser.add_argument('--trainable-var', dest='trainable_var', action='store_true', default=False,
                         help="Learn variance of decoder. If false, set to constant '1.0'.")
+    parser.add_argument('--bs', dest='bs_sample', action='store_true', default=False,
+                        help="Apply on bootstrap sample of data.")
 
     # DAA loss: weights
     parser.add_argument('--at-loss-factor', type=float, default=100.0)
@@ -473,7 +484,7 @@ if __name__ == '__main__':
     parser.add_argument('--kl-decrease-factor', type=float, default=1.5)
 
     # loading already existing model
-    parser.add_argument('--test-model', dest='test_model', action='store_false', default=False)
+    parser.add_argument('--test-model', dest='test_model', action='store_true', default=False)
     parser.add_argument('--model-substr', type=str, default=None)
 
     # Different settings for the prior
