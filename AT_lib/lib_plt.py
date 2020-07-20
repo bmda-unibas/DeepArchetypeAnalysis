@@ -63,7 +63,7 @@ def plot_samples(samples, latent_codes, labels,
             # ax.plot(Z_fix[0, :], Z_fix[1, :], 'r-')
             # ax.plot(Z_fix[1, :], Z_fix[2, :], 'r-')
             # ax.plot(Z_fix[2, :], Z_fix[0, :], 'r-')
-        colors = ["blue", "orange", "green", "purple", "black"]
+        colors = ["#00CB50", "#F350C0", "#00D8FC", "#EC001C", "#9230DD"]
         label_str = ["HAP", "SAD", "SUR", "ANG", "DIS"]
         for lab in np.unique(labels):
             coords = latent_codes[labels == lab, ...]
