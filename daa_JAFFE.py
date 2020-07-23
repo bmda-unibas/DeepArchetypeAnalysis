@@ -213,7 +213,7 @@ def main():
             label_z_fixed = np.argmax(Y_test[idx_closest_to_at, ...], axis=1)
 
         fig_zfixed = lib_plt.plot_samples(samples=image_z_fixed, latent_codes=latent_code_train,
-                                          labels=np.argmax(Y, axis=1),
+                                          labels=np.argmax(Y_test, axis=1),
                                           epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)],
                                           img_labels=label_z_fixed)
         fig_zfixed.savefig(path, dpi=300)

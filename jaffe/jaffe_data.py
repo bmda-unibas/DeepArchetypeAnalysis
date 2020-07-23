@@ -41,7 +41,7 @@ def get_jaffe_data(csv_path, image_path, crop=True):
         if crop:
             size = 128
         else:
-            size = 258
+            size = 256
         image_data.append(image.reshape(size * size))
 
     image_data = (np.array(image_data) / 255).reshape(-1, size, size)
