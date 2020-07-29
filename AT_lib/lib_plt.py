@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
 
+
 def interpolate_points(coord_init, coord_end, nb_samples):
     """
     Utility function for interpolation between two points.
@@ -19,7 +20,8 @@ def interpolate_points(coord_init, coord_end, nb_samples):
 
 def plot_samples(samples, latent_codes, labels,
                  epoch, nrows=1,
-                 titles=None, size=1, latent_ticks=False, cmap='gray'):
+                 titles=None, size=2, latent_ticks=False, cmap='gray',
+                 img_labels=None):
     """
         Plots the given samples as well as the latent codes (if the latent dimension is <3).
     :param samples:
@@ -32,13 +34,18 @@ def plot_samples(samples, latent_codes, labels,
     :param name_prefix:
     :param size:
     :param latent_ticks:
+    :param img_labels:
     :return:
     """
     assert titles is None or len(titles) == len(samples)
 
     Z_fix = np.array([[1., 0.],
                       [-0.5, 0.8660254],
-                      [-0.5, -0.8660254]])
+                      [-0.5, -0.8660254],
+                      [1., 0.]
+                      ])
+    xticks = np.arange(-1, 1.1, 0.25)
+    yticks = np.arange(-0.75, 1.30, 0.25)
 
     ncols = np.ceil(len(samples) / nrows)
     if latent_codes.shape[1] <= 3 and ncols * nrows < len(samples) + 1:
@@ -48,34 +55,51 @@ def plot_samples(samples, latent_codes, labels,
 
     no_ticks = dict(left=False, bottom=False, labelleft=False, labelbottom=False)
     title = ''
+
+    colors = ["#00CB50", "#F350C0", "#00D8FC", "#EC001C", "#9230DD"]
+    label_str = ["happiness", "sadness", "surprise", "anger", "disgust"]
+    markers = ["^", "p", "d", "o", "H"]
+
     if latent_codes.shape[1] <= 3:
-        if latent_codes.shape[1] == 3:
-            ax = fig.add_subplot(nrows, ncols, 1, projection='3d')
-            if epoch is not None:
-                title = 'Epoch {0}   -  {1}'.format(epoch, title)
+        with sns.axes_style("darkgrid"):
+            if latent_codes.shape[1] == 3:
+                ax = fig.add_subplot(nrows, ncols, 1, projection='3d')
+                if epoch is not None:
+                    title = 'Epoch {0}   -  {1}'.format(epoch, title)
 
-        else:
-            ax = fig.add_subplot(nrows, ncols, 1)
-            if epoch is not None:
-                ax.set_ylabel('Epoch {}'.format(epoch))
-            ax.set_aspect('equal')
-            # ax.plot(Z_fix[0, :], Z_fix[1, :], 'r-')
-            # ax.plot(Z_fix[1, :], Z_fix[2, :], 'r-')
-            # ax.plot(Z_fix[2, :], Z_fix[0, :], 'r-')
+            else:
+                ax = fig.add_subplot(nrows, ncols, 1)
+                if epoch is not None:
+                    ax.set_ylabel('Epoch {}'.format(epoch))
+                ax.set_aspect('equal')
+                # ax.plot(Z_fix[0, :], Z_fix[1, :], 'r-')
+                # ax.plot(Z_fix[1, :], Z_fix[2, :], 'r-')
+                # ax.plot(Z_fix[2, :], Z_fix[0, :], 'r-')
+            for lab in np.unique(labels):
+                coords = latent_codes[labels == lab, ...]
+                ax.scatter(coords[:, 1], coords[:, 0],
+                           s=3, c=np.repeat(colors[lab], coords.shape[0]), label=label_str[lab], alpha=0.5,
+                           marker=markers[lab])
+            # ax.scatter(*[latent_codes[:, i] for i in range(latent_codes.shape[1])],
+            #            s=5, c=labels, label=np.unique(labels), alpha=0.5)
+            l = ax.legend(fontsize=7, loc='center left', bbox_to_anchor=(-0.7, 0.5), markerscale=4)
 
-        ax.scatter(*[latent_codes[:, i] for i in range(latent_codes.shape[1])],
-                   s=2, c=labels, alpha=0.5)
+            # plt.setp(l.get_title(), fontsize=6)
+            ax.scatter(Z_fix[:-1, 1], Z_fix[:-1, 0], color='darkred', marker='x', s=8)
+            ax.plot(Z_fix[:, 1], Z_fix[:, 0], color='darkblue', linestyle=(0, (2, 1, 2, 1)), linewidth=1)
 
-        if not latent_ticks:
-            ax.set_xlim(latent_codes.min() - .1, latent_codes.max() + .1)
-            ax.set_ylim(latent_codes.min() - .1, latent_codes.max() + .1)
-            ax.tick_params(axis='both', which='both', **no_ticks)
-        else:
-            ax.set_xlim(-2.5, 2.5)
-            ax.set_ylim(-2.5, 2.5)
-            ax.xaxis.label.set_size(5)
-            ax.yaxis.label.set_size(5)
-            ax.tick_params(axis='both', which='both', labelsize=4)
+            ax.set_xlim(np.min(xticks), np.max(xticks))
+            ax.set_ylim(np.min(yticks), np.max(yticks))
+            ax.set_xticks(xticks)
+            ax.set_yticks(yticks)
+            if not latent_ticks:
+                ax.tick_params(axis='both', which='both', **no_ticks)
+            else:
+                ax.xaxis.label.set_size(5)
+                ax.yaxis.label.set_size(5)
+                ax.tick_params(axis='both', which='both', labelsize=4)
+
+            ax.set_ylim(ax.get_ylim()[::-1])
         offset = 1
     else:
         offset = 0
@@ -89,9 +113,13 @@ def plot_samples(samples, latent_codes, labels,
         if titles is not None:
             ax.set_title(titles[i], ha='center', va='center', alpha=.8, size=7)
             i += 1
+        if img_labels is not None:
+            for idx_, spine in enumerate(ax.spines.values()):
+                spine.set_edgecolor(colors[img_labels[index]])
+                spine.set_linewidth(4)
 
-        # ax.tick_params(axis='both', which='both', **no_ticks)
-        ax.axis('off')
+        ax.tick_params(axis='both', which='both', **no_ticks)
+        # ax.axis('off')
 
     fig.suptitle(title, fontsize=8)
     return fig

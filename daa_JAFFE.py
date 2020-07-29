@@ -19,8 +19,9 @@ from jaffe import jaffe_data
 
 tfd = tf.contrib.distributions
 
+
 # If error message "Could not connect to any X display." is issued, uncomment the following line:
-#os.environ['QT_QPA_PLATFORM']='offscreen'
+# os.environ['QT_QPA_PLATFORM']='offscreen'
 
 def main():
     def build_loss():
@@ -29,7 +30,7 @@ def main():
         :return: archetype_loss, class_loss, likelihood, divergence, elbo
         """
         likelihood = tf.reduce_sum(x_hat.log_prob(data))
-        if args.vamp_prior or args.dir_prior:
+        if args.dir_prior:
             q_sample = t_posterior.sample(50)
             divergence = tf.reduce_mean(encoded_z_data["p"].log_prob(q_sample) - prior.log_prob(q_sample))
         else:
@@ -47,7 +48,7 @@ def main():
             args.recon_loss_factor * likelihood
             - args.class_loss_factor * class_loss
             - args.at_loss_factor * archetype_loss
-            - args.kl_loss_factor * divergence
+            - kl_loss_factor * divergence
         )
 
         return archetype_loss, class_loss, likelihood, divergence, elbo
@@ -60,39 +61,38 @@ def main():
 
     # # Japanese Face Expressions
 
-    num_total_samples, n_labels, data_shape = jaffe_data.get_jaffe_dimensions(JAFFE_CSV_P, crop=True)
-    n_batches = int(num_total_samples / args.batch_size)
+    X, Y, jaffe_meta_data = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR, crop=True)
 
-    def get_next_batch(batch_size):
-        """
-        Helper function for getting mini batches.
-        :param batch_size:
-        :return: mb_x, mb_y
-        """
-        mb_x, mb_y = jaffe_data.get_jaffe_batch(batch_size=batch_size,
-                                                csv=JAFFE_CSV_P,
-                                                image_path=JAFFE_IMGS_DIR, crop=True)
-        mb_y = mb_y[:, np.arange(args.num_labels)]
-        return mb_x, mb_y
 
-    all_images, all_labels = jaffe_data.get_jaffe_batch(batch_size=180,
-                                                        csv=JAFFE_CSV_P,
-                                                        image_path=JAFFE_IMGS_DIR, crop=True, shuffle=False)
-    some_images = all_images[:args.batch_size]
-    some_labels = all_labels[:args.batch_size]
-    all_imgs_ext = np.vstack((all_images, all_images[:args.batch_size]))
-    jaffe_meta_data = pd.read_csv(JAFFE_CSV_P, header=0, delimiter=" ")
+    if args.bs_sample:
+        bs_idx = np.random.choice(X.shape[0], size=X.shape[0], replace=True)
+        X = X[bs_idx, ...]
+        Y = Y[bs_idx, ...]
+        jaffe_meta_data = jaffe_meta_data.iloc[bs_idx]
 
-    ####################################################################################################################
+    X_test, Y_test, jaffe_meta_data_test = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR,
+                                                                     crop=True)
+    X_noncrop, _, _ = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR,
+                                                crop=False)
+    Y = Y[..., :args.num_labels]
+
+    train_data = tf.data.Dataset.from_tensor_slices((X, Y)).shuffle(buffer_size=180).batch(args.batch_size).repeat(-1)
+    test_data = tf.data.Dataset.from_tensor_slices((X_test, Y_test)).batch(args.batch_size).repeat(-1)
+
+    data_shape = list(X.shape[1:])
+
+    all_imgs_ext = np.vstack((X, X[:args.batch_size]))
+
     # ########################################### Data Placeholders ####################################################
     data = tf.placeholder(tf.float32, [None] + data_shape, 'data')
     side_information = tf.placeholder(tf.float32, [None, args.num_labels], 'labels')
     latent_code = tf.placeholder(tf.float32, [None, args.dim_latentspace], 'latent_code')
 
+    kl_loss_factor = tf.Variable(args.kl_loss_factor, dtype='float32', trainable=False)
+
     assert data_shape == [data.shape[i].value for i in
                           range(1, len(data.shape))], "Specified data shape does not coincide with data placeholder."
 
-    ####################################################################################################################
     # ########################################### Model Setup ##########################################################
     z_fixed_ = lib_at.create_z_fix(args.dim_latentspace)
     z_fixed = tf.cast(z_fixed_, tf.float32)
@@ -104,12 +104,7 @@ def main():
 
     decoder = lib_vae.build_decoder(data_shape=data_shape, num_labels=args.num_labels, trainable_var=args.trainable_var)
 
-    if args.vamp_prior:
-        K = args.vamp_num_inducing
-        u_pseudo = tf.Variable(get_next_batch(K)[0], dtype=tf.float32, trainable=True)
-        prior = tfd.MixtureSameFamily(mixture_distribution=tfd.Categorical(probs=[1. / float(K)] * K),
-                                      components_distribution=encoder_net(u_pseudo)["p"])
-    elif args.dir_prior:
+    if args.dir_prior:
         prior_dir = tfd.Dirichlet([1.] * nAT)
         prior = tfd.MultivariateNormalDiag(tf.matmul(prior_dir.sample(args.batch_size), z_fixed),
                                            tf.ones(args.dim_latentspace))
@@ -131,7 +126,8 @@ def main():
     archetype_loss, sideinfo_loss, likelihood, kl_divergence, elbo = build_loss()
 
     # Build the optimizer
-    optimizer = tf.train.AdamOptimizer(args.learning_rate).minimize(-elbo)
+    lr = tf.Variable(args.learning_rate, trainable=False)
+    optimizer = tf.train.AdamOptimizer(lr).minimize(-elbo)
 
     # reconstruction of random samples from a dirichlet
     dirichlet_prior = lib_vae.dirichlet_prior(dim_latentspace=args.dim_latentspace, alpha=0.7)
@@ -188,29 +184,42 @@ def main():
         fig.savefig(FINAL_RESULTS_DIR / filename, dpi=600)
         plt.close(fig)
 
-    def plot_z_fixed(path=None):
+    def plot_z_fixed(path, plot_generated=False):
         """
         Plot at the archetypes Z_fixed.
         :param path: target path for the file. Defaults to FINAL_RESULTS_DIR/'Z_fixed_final.png'
+        :param plot_generated:
         :return:
         """
 
-        samples_z_fixed = sess.run(latent_decoded_x.mean(), {latent_code: z_fixed_})
-
         latent_code_test = None
-        for i in range(all_imgs_ext.shape[0] // args.batch_size):
-            min_idx = i * args.batch_size
-            max_idx = (i + 1) * args.batch_size
+        for i in range(num_mb_its_per_epoch_test):
+            mb_x, mb_y = sess.run(test_iterator)
 
-            tmp = sess.run(mu_t, feed_dict={data: all_images[min_idx:max_idx],
-                                            side_information: all_labels[min_idx:max_idx]})
+            tmp = sess.run(mu_t, feed_dict={data: mb_x,
+                                            side_information: mb_y})
             latent_code_test = np.vstack((latent_code_test, tmp)) if latent_code_test is not None else tmp
 
-        latent_code_test = latent_code_test[:all_images.shape[0]]
-        fig_zfixed = lib_plt.plot_samples(samples=samples_z_fixed, latent_codes=latent_code_test,
-                                          labels=np.argmax(all_labels, axis=1),
-                                          epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)])
-        fig_zfixed.savefig(path, dpi=600)
+        assert latent_code_test.shape[0] == X.shape[0]
+
+        if plot_generated:
+            image_z_fixed, label_z_fixed = sess.run([latent_decoded_x.mean(), latent_decoded_y],
+                                                    {latent_code: z_fixed_})
+            label_z_fixed = np.argmax(label_z_fixed, axis=1)
+        else:
+            idx_closest_to_at = []
+            for i in range(z_fixed_.shape[0]):
+                idx_closest_to_at.append(np.argmin(np.linalg.norm(latent_code_test - z_fixed_[i, ...], axis=1)))
+            image_z_fixed = X_noncrop[idx_closest_to_at, ...]
+            label_z_fixed = np.argmax(Y_test[idx_closest_to_at, ...], axis=1)
+        scatterplot_labels = np.argmax(Y_test, axis=1)
+
+
+        fig_zfixed = lib_plt.plot_samples(samples=image_z_fixed, latent_codes=latent_code_test,
+                                          labels=scatterplot_labels,
+                                          epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)],
+                                          img_labels=label_z_fixed)
+        fig_zfixed.savefig(path, dpi=300)
         plt.close(fig_zfixed)
 
     def plot_random_samples(path):
@@ -269,8 +278,8 @@ def main():
         idx_img1 = jaffe_meta_data[jaffe_meta_data["PIC"] == start_img_str].index[0]
         idx_img2 = jaffe_meta_data[jaffe_meta_data["PIC"] == end_img_str].index[0]
 
-        img_1 = all_images[[idx_img1], :]
-        img_2 = all_images[[idx_img2], :]
+        img_1 = X[[idx_img1], :]
+        img_2 = X[[idx_img2], :]
 
         latent_path_interpol = lib_plt.interpolate_points(coord_init=sess.run(mu_t, {data: img_1}),
                                                           coord_end=sess.run(mu_t, {data: img_2}),
@@ -328,43 +337,72 @@ def main():
             min_idx = i * args.batch_size
             max_idx = (i + 1) * args.batch_size
 
-            tmp_mu = sess.run(mu_t, feed_dict={data: all_images[min_idx:max_idx],
-                                               side_information: all_labels[min_idx:max_idx]})
+            tmp_mu = sess.run(mu_t, feed_dict={data: X[min_idx:max_idx],
+                                               side_information: Y[min_idx:max_idx]})
             test_pos_mean = np.vstack((test_pos_mean, tmp_mu)) if test_pos_mean is not None else tmp_mu
 
-        test_pos_mean = test_pos_mean[:all_images.shape[0]]
+        test_pos_mean = test_pos_mean[:X.shape[0]]
 
-        array_all = np.hstack((test_pos_mean, all_labels))
+        array_all = np.hstack((test_pos_mean, Y))
         cols_dims = [f'ldim{i}' for i in range(args.dim_latentspace)]
         df = pd.DataFrame(array_all, columns=cols_dims + ['HAP', 'SAD', 'SUR', 'ANG', 'DIS'])
         return df
 
     ####################################################################################################################
     # ########################################### Training Loop ########################################################
+    num_mb_its_per_epoch = int(np.ceil(X.shape[0] / args.batch_size))
+    num_mb_its_per_epoch_test = int(np.ceil(X_test.shape[0] / args.batch_size))
+
     saver = tf.train.Saver()
     step = 0
     sess.run(tf.global_variables_initializer())
+    train_iterator = train_data.make_one_shot_iterator().get_next()
+    test_iterator = test_data.make_one_shot_iterator().get_next()
 
+    adjusted_lr = False
+    cur_kl_factor = 5000
     if not args.test_model:
         writer = tf.summary.FileWriter(logdir=TENSORBOARD_DIR, graph=sess.graph)
         for epoch in range(args.n_epochs):
-            for b in range(n_batches):
-                mb_x, mb_y = get_next_batch(args.batch_size)
+            if epoch >= 2000 and not adjusted_lr:
+                tf.assign(lr, 5e-4)
+                adjusted_lr = True
 
-                feed_train = {data: mb_x, side_information: mb_y}
+            for b in range(num_mb_its_per_epoch):
+                mb_x, mb_y = sess.run(train_iterator)
+                feed_train = {data: mb_x, side_information: mb_y, kl_loss_factor: cur_kl_factor}
                 sess.run(optimizer, feed_dict=feed_train)
                 step += 1
 
             if epoch % args.test_frequency_epochs == 0:
+                cur_kl_factor = max(cur_kl_factor / args.kl_decrease_factor, args.kl_loss_factor)
+                print(f"Current KL Loss Factor: {cur_kl_factor}")
                 # evaluate metrics on some images; NOTE that this is no real test set
                 tensors_test = [summary_op, elbo,
                                 likelihood,
                                 kl_divergence, archetype_loss, sideinfo_loss]
-                feed_test = {data: some_images, side_information: some_labels}
-                summary, test_total_loss, test_likelihood, test_kl, test_atl, test_sideinfol = sess.run(tensors_test,
-                                                                                                        feed_test)
 
-                writer.add_summary(summary, global_step=step)
+                test_total_loss, test_likelihood, test_kl, test_atl, test_sideinfol = 0, 0, 0, 0, 0
+                for b in range(num_mb_its_per_epoch_test):
+                    mb_x, mb_y = sess.run(test_iterator)
+                    feed_test = {data: mb_x, side_information: mb_y, kl_loss_factor: cur_kl_factor}
+                    summary, test_total_loss_, test_likelihood_, test_kl_, test_atl_, test_sideinfol_ = sess.run(
+                        tensors_test,
+                        feed_test)
+                    writer.add_summary(summary, global_step=step)
+
+                    test_total_loss += test_total_loss_
+                    test_likelihood += test_likelihood_
+                    test_kl += test_kl_
+                    test_atl += test_atl_
+                    test_sideinfol += test_sideinfol_
+
+                test_total_loss /= num_mb_its_per_epoch
+                test_likelihood /= num_mb_its_per_epoch
+                test_kl /= num_mb_its_per_epoch
+                test_atl /= num_mb_its_per_epoch
+                test_sideinfol /= num_mb_its_per_epoch
+
                 print(str(args.runNB) + '\nEpoch ' + str(epoch) + ':\n', 'Total Loss:', test_total_loss,
                       '\n Likelihood:', np.mean(test_likelihood),
                       '\n Divergence:', np.mean(test_kl),
@@ -373,22 +411,23 @@ def main():
                       )
 
                 # reconstruction from the location of the fixed archetypes
-                plot_z_fixed(IMGS_DIR / f'Z_fixed_epoch{epoch}.png')
-                plot_random_samples(IMGS_DIR / f'random_sample_epoch{epoch}.png')
+                plot_z_fixed(IMGS_DIR / f'Z_fixed_epoch{epoch}.png', plot_generated=True)
+                # plot_random_samples(IMGS_DIR / f'random_sample_epoch{epoch}.png')
 
             if epoch % args.save_each == 0 and epoch > 0:
                 saver.save(sess, save_path=SAVED_MODELS_DIR / "save", global_step=epoch)
 
-        saver.save(sess, save_path=SAVED_MODELS_DIR / "save", global_step=args.n_epochs)
         print("Model Trained!")
         print("Tensorboard Path: {}".format(TENSORBOARD_DIR))
-        print("Saved Model Path: {}".format(SAVED_MODELS_DIR))
-
+        if args.save_model:
+            saver.save(sess, save_path=SAVED_MODELS_DIR / "save", global_step=args.n_epochs)
+            print("Saved Model Path: {}".format(SAVED_MODELS_DIR))
         # create folder for inference results in the folder of the most recently trained model
         if not FINAL_RESULTS_DIR.exists():
             os.mkdir(FINAL_RESULTS_DIR)
 
-        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final.png')
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final.png', plot_generated=False)
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final_closest.png', plot_generated=True)
 
         df = create_latent_df()
         df.to_csv(FINAL_RESULTS_DIR / "latent_codes.csv", index=False)
@@ -410,7 +449,8 @@ def main():
         # Plots
         print("Creating plots in '{0}'".format(FINAL_RESULTS_DIR))
         plot_latent_traversal()
-        plot_z_fixed()
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final.png', plot_generated=False)
+        plot_z_fixed(FINAL_RESULTS_DIR / 'Z_fixed_final_closest.png', plot_generated=True)
         plot_hinton(weight_target=0.65)
         plot_interpolation(start_img_str="YM.HA3", end_img_str="MK.SA3")
 
@@ -427,8 +467,8 @@ if __name__ == '__main__':
 
     # NN settings
     parser.add_argument('--gpu', type=str, default='0')
-    parser.add_argument('--learning-rate', type=float, default=1e-4)
-    parser.add_argument('--n-epochs', type=int, default=5001)
+    parser.add_argument('--learning-rate', type=float, default=1e-3)
+    parser.add_argument('--n-epochs', type=int, default=3001)
     parser.add_argument('--batch-size', type=int, default=50)
     parser.add_argument('--dim-latentspace', type=int, default=2,
                         help="Number of Archetypes = Latent Space Dimension + 1")
@@ -436,31 +476,30 @@ if __name__ == '__main__':
     parser.add_argument('--num_labels', type=int, default=5)
     parser.add_argument('--trainable-var', dest='trainable_var', action='store_true', default=False,
                         help="Learn variance of decoder. If false, set to constant '1.0'.")
+    parser.add_argument('--bs', dest='bs_sample', action='store_true', default=False,
+                        help="Apply on bootstrap sample of data.")
 
     # DAA loss: weights
-    parser.add_argument('--at-loss-factor', type=float, default=80.0)
-    parser.add_argument('--class-loss-factor', type=float, default=80.0)
-    parser.add_argument('--recon-loss-factor', type=float, default=1.0)
+    parser.add_argument('--at-loss-factor', type=float, default=100.0)
+    parser.add_argument('--class-loss-factor', type=float, default=200.0)
+    parser.add_argument('--recon-loss-factor', type=float, default=0.4)
     parser.add_argument('--kl-loss-factor', type=float, default=40.0)
+    parser.add_argument('--kl-decrease-factor', type=float, default=1.5)
 
     # loading already existing model
-    parser.add_argument('--test-model', dest='test_model', action='store_false', default=False)
+    parser.add_argument('--test-model', dest='test_model', action='store_true', default=False)
+    parser.add_argument('--save-model', dest='save_model', action='store_true', default=False)
     parser.add_argument('--model-substr', type=str, default=None)
 
     # Different settings for the prior
-    parser.add_argument('--vamp-prior', dest='vamp_prior', action='store_true', default=False,
-                        help="Use the vamp prior instead of a standard normal.")
     parser.add_argument('--dir-prior', dest='dir_prior', action='store_true', default=False,
                         help="Use the dirichlet + Gauss noise prior instead of a standard normal.")
-    parser.add_argument('--vamp-num-inducing', dest='vamp_num_inducing', type=int, default=50,
-                        help="Number of inducing points for the Vamp Prior.")
     parser.add_argument('--vae', dest='vae', action='store_true', default=False,
                         help="Train standard vae instead of AT.")
 
     args = parser.parse_args()
     print(args)
 
-    assert not (args.dir_prior and args.vamp_prior), "The different priors are mutually exclusive."
     assert 0 < args.num_labels <= 5, "Choose up to 5 labels."
 
     nAT = args.dim_latentspace + 1

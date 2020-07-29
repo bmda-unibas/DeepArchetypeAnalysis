@@ -25,6 +25,29 @@ def get_jaffe_dimensions(csv, crop):
     return n_samples, n_labels, image_shape
 
 
+def get_jaffe_data(csv_path, image_path, crop=True):
+    meta_data = pd.read_csv(csv_path, header=0, delimiter=" ")
+    meta_data["PIC"] = meta_data["PIC"].str.replace("-", ".")
+
+    image_data = []
+    for image_name, number in zip(meta_data["PIC"], meta_data["#"]):
+        image_file = "%s.%d.tiff" % (image_name, number)
+        image_file_path = os.path.join(image_path, image_file)
+        image = imageio.imread(image_file_path)
+        if crop:
+            image = image[94:222, 64:192]
+        if len(image.shape) == 3:
+            image = np.mean(image, axis=2)
+        if crop:
+            size = 128
+        else:
+            size = 256
+        image_data.append(image.reshape(size * size))
+
+    image_data = (np.array(image_data) / 255).reshape(-1, size, size)
+    return image_data, meta_data[['HAP', 'SAD', 'SUR', 'ANG', 'DIS']].values, meta_data
+
+
 def get_jaffe_batch(batch_size, csv, image_path, crop=True, shuffle=True):
     """
     Return one mb
