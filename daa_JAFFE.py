@@ -63,6 +63,7 @@ def main():
 
     X, Y, jaffe_meta_data = jaffe_data.get_jaffe_data(csv_path=JAFFE_CSV_P, image_path=JAFFE_IMGS_DIR, crop=True)
 
+
     if args.bs_sample:
         bs_idx = np.random.choice(X.shape[0], size=X.shape[0], replace=True)
         X = X[bs_idx, ...]
@@ -191,15 +192,15 @@ def main():
         :return:
         """
 
-        latent_code_train = None
+        latent_code_test = None
         for i in range(num_mb_its_per_epoch_test):
             mb_x, mb_y = sess.run(test_iterator)
 
             tmp = sess.run(mu_t, feed_dict={data: mb_x,
                                             side_information: mb_y})
-            latent_code_train = np.vstack((latent_code_train, tmp)) if latent_code_train is not None else tmp
+            latent_code_test = np.vstack((latent_code_test, tmp)) if latent_code_test is not None else tmp
 
-        assert latent_code_train.shape[0] == X.shape[0]
+        assert latent_code_test.shape[0] == X.shape[0]
 
         if plot_generated:
             image_z_fixed, label_z_fixed = sess.run([latent_decoded_x.mean(), latent_decoded_y],
@@ -208,12 +209,14 @@ def main():
         else:
             idx_closest_to_at = []
             for i in range(z_fixed_.shape[0]):
-                idx_closest_to_at.append(np.argmin(np.linalg.norm(latent_code_train - z_fixed_[i, ...], axis=1)))
+                idx_closest_to_at.append(np.argmin(np.linalg.norm(latent_code_test - z_fixed_[i, ...], axis=1)))
             image_z_fixed = X_noncrop[idx_closest_to_at, ...]
             label_z_fixed = np.argmax(Y_test[idx_closest_to_at, ...], axis=1)
+        scatterplot_labels = np.argmax(Y_test, axis=1)
 
-        fig_zfixed = lib_plt.plot_samples(samples=image_z_fixed, latent_codes=latent_code_train,
-                                          labels=np.argmax(Y_test, axis=1),
+
+        fig_zfixed = lib_plt.plot_samples(samples=image_z_fixed, latent_codes=latent_code_test,
+                                          labels=scatterplot_labels,
                                           epoch=None, titles=[f"Archetype {i + 1}" for i in range(nAT)],
                                           img_labels=label_z_fixed)
         fig_zfixed.savefig(path, dpi=300)
@@ -414,11 +417,11 @@ def main():
             if epoch % args.save_each == 0 and epoch > 0:
                 saver.save(sess, save_path=SAVED_MODELS_DIR / "save", global_step=epoch)
 
-        saver.save(sess, save_path=SAVED_MODELS_DIR / "save", global_step=args.n_epochs)
         print("Model Trained!")
         print("Tensorboard Path: {}".format(TENSORBOARD_DIR))
-        print("Saved Model Path: {}".format(SAVED_MODELS_DIR))
-
+        if args.save_model:
+            saver.save(sess, save_path=SAVED_MODELS_DIR / "save", global_step=args.n_epochs)
+            print("Saved Model Path: {}".format(SAVED_MODELS_DIR))
         # create folder for inference results in the folder of the most recently trained model
         if not FINAL_RESULTS_DIR.exists():
             os.mkdir(FINAL_RESULTS_DIR)
@@ -485,6 +488,7 @@ if __name__ == '__main__':
 
     # loading already existing model
     parser.add_argument('--test-model', dest='test_model', action='store_true', default=False)
+    parser.add_argument('--save-model', dest='save_model', action='store_true', default=False)
     parser.add_argument('--model-substr', type=str, default=None)
 
     # Different settings for the prior
